@@ -1,5 +1,6 @@
 MCU_FAMILY = NUMICRO
 MCU_SERIES = NUC123
+EEPROM_DRIVER = emulated_eeprom
 
 # Bootloader selection
 BOOTLOADER = custom

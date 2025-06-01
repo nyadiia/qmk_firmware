@@ -28,6 +28,10 @@
 #    include "hal.h"
 #    include "progmem.h"
 #    include "rgb_matrix.h"
+#    include "eeconfig.h"
+#    include "config.h" // For rgb_config_t
+
+rgb_config_t global_rgb_config;
 
 #    define MBIA045_CFGREG_DEFAULT 0b1000010000000000u
 
@@ -70,6 +74,48 @@ mbi_color g_led_buffer[RGB_MATRIX_LED_COUNT];
 
 bool    g_pwm_buffer_update_required = false;
 uint8_t g_pwm_buffer_row             = 0;
+
+// New functions for EEPROM loading
+void rgb_matrix_apply_loaded_config(void) {
+    // Apply the settings from global_rgb_config to the live QMK RGB Matrix state.
+    rgb_matrix_mode_noeeprom(global_rgb_config.rgbs.mode);
+    rgb_matrix_sethsv_noeeprom(global_rgb_config.rgbs.h, global_rgb_config.rgbs.s, global_rgb_config.rgbs.v);
+}
+
+void rgb_matrix_load_eeprom(void) {
+    global_rgb_config.raw = eeconfig_read_user();
+    rgb_matrix_apply_loaded_config();
+}
+
+void rgb_matrix_save_eeprom(void) {
+    global_rgb_config.rgbs.mode = rgb_matrix_get_mode();
+    rgb_matrix_get_hsv(&global_rgb_config.rgbs.h, &global_rgb_config.rgbs.s, &global_rgb_config.rgbs.v);
+    // If speed were part of global_rgb_config, it would be:
+    // global_rgb_config.rgbs.speed = rgb_matrix_get_speed();
+    eeconfig_update_user(global_rgb_config.raw);
+}
+
+void eeconfig_init_user(void) {
+    // Set default RGB configuration values
+    global_rgb_config.rgbs.mode = 1; // Default to a common mode, e.g., static or a gentle animation.
+                                     // RGB_MATRIX_DEFAULT_MODE could be used if defined and suitable.
+                                     // For this driver, mode 1 might map to something specific if QMK modes are used.
+                                     // Let's pick a common default QMK mode, e.g., RGB_MATRIX_SOLID_COLOR (often mode 0 or 1).
+                                     // Consulting `enum rgb_matrix_effects` in `rgb_matrix_defs.h` for standard effect numbers.
+                                     // RGB_MATRIX_SOLID_COLOR is typically 1.
+    global_rgb_config.rgbs.h = 0;    // Default Hue (e.g., Red)
+    global_rgb_config.rgbs.s = 255;  // Default Saturation (Full)
+    global_rgb_config.rgbs.v = 128;  // Default Value (Brightness, moderate)
+                                     // RGB_MATRIX_DEFAULT_VAL could be used if defined.
+
+    // Write these default settings to EEPROM
+    eeconfig_update_user(global_rgb_config.raw);
+
+    // Also apply these defaults to the current live RGB state
+    // This ensures that if the keyboard continues to run after EEPROM reset,
+    // the live state matches the new default EEPROM state.
+    rgb_matrix_apply_loaded_config(); // This function already applies what's in global_rgb_config
+}
 
 void MBIA045_init(void);
 void MBIA045_set_current_gain(uint8_t gain);
@@ -153,6 +199,9 @@ void MBIA045_init(void) {
 
     // Start PWM channel 0 and 1
     PWMA->PCR |= (1 << PWM_PCR_CH0EN_Pos | 1 << PWM_PCR_CH1EN_Pos);
+
+    // Load saved RGB settings from EEPROM and apply them
+    rgb_matrix_load_eeprom();
 
     MBIA045_disable_rows();
 

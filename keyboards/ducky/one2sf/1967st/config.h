@@ -18,3 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #pragma once
 
 #define GPIO_INPUT_PIN_DELAY (NUC123_HCLK / 6 / 1000000L)
+
+// Structure for storing RGB settings in EEPROM
+typedef union {
+    uint32_t raw;
+    struct {
+        uint8_t mode;  // Current RGB mode
+        uint8_t h;     // Hue
+        uint8_t s;     // Saturation
+        uint8_t v;     // Value (brightness)
+    } rgbs;
+} rgb_config_t;
